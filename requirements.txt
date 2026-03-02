@@ -1,0 +1,25 @@
+# =========================================================
+# PART 1: FOR IMAGE PREPROCESSING
+# =========================================================
+opencv-python>=4.8.0      # Library behind 'import cv2'
+numpy>=1.24.0             # Array manipulation (import numpy as np)
+tqdm>=4.65.0              # Progress bar
+
+# =========================================================
+# PART 2: FOR API, DATABASE AND FEATURE EXTRACTION
+# =========================================================
+# -- Feature Extraction (Shape, Texture, Deep Learning) --
+scikit-image>=0.21.0      # Required for Texture features (Haralick GLCM)
+scikit-learn>=1.3.0       # Support for distance functions/evaluation
+# torch>=2.0.0            # PyTorch for Deep Learning
+
+# -- Backend API --
+fastapi>=0.103.0          # High performance API framework
+uvicorn>=0.23.2           # Server for FastAPI
+python-multipart>=0.0.6   # Required for file uploads
+python-dotenv>=1.0.0      # Read environment variables from .env
+
+# -- Database (PostgreSQL + pgvector) --
+SQLAlchemy>=2.0.20        # ORM for database interaction
+psycopg2-binary>=2.9.7    # PostgreSQL driver
+pgvector>=0.2.3           # Vector storage and query for PostgreSQL

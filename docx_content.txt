@@ -1,0 +1,30 @@
+I. Hình dạng
+Nhóm 1: Các đặc trưng Hình thái Hình học (7 tham số)
+Đây là các tham số vật lý trực quan nhất, mô tả trực tiếp cấu trúc bên ngoài của chiếc lá.
+Tỷ lệ khung hình (Aspect Ratio): * Công thức:  (của hình chữ nhật nhỏ nhất bao quanh lá).
+Ý nghĩa: Chỉ số cơ bản nhất để phân chia nhóm lá dài (như lá liễu, lá sả) với nhóm lá tròn/bè (như lá sen, lá bàng).
+Độ đặc (Solidity): * Công thức: (Diện tích thực chia cho diện tích đa giác lồi bao quanh).
+Ý nghĩa: Cực kỳ nhạy bén trong việc phát hiện lá xẻ thùy. Lá có mép nguyên (như lá đa) sẽ có Solidity gần bằng 1, trong khi lá xẻ thùy sâu (như lá phong, lá đu đủ) sẽ có giá trị này rất thấp.
+Độ tròn (Circularity / Compactness):
+Công thức: 
+Ý nghĩa: Đánh giá mức độ nhẵn của đường viền và độ tròn tổng thể. Cùng một diện tích, lá có mép răng cưa nhiều sẽ có chu vi (Perimeter) lớn hơn, làm giảm đáng kể giá trị này.
+Độ lồi mép lá (Convexity):
+Công thức:  (Chu vi đa giác lồi chia cho chu vi thực của lá).
+Ý nghĩa: Chuyên dùng để bắt các chi tiết "răng cưa" trên mép lá. Lá càng có nhiều răng cưa nhỏ li ti, tỷ lệ này càng thấp.
+Độ bao phủ (Extent):
+Công thức: 
+Ý nghĩa: Giúp phân biệt các lá có hình dạng đặc biệt. Ví dụ, lá hình tim (cordate) hoặc hình mũi mác sẽ lấp đầy khung chữ nhật kém hơn so với lá hình elip hay hình trứng.
+Độ lệch tâm (Eccentricity):
+Định nghĩa: Tính toán dựa trên một hình elip tương đương bao quanh chiếc lá.
+Ý nghĩa: Giá trị chạy từ 0 (hình tròn xoe) đến 1 (một đoạn thẳng). Thông số này giúp mô tả độ "dẹt" của lá một cách trơn tru hơn so với Aspect Ratio.
+Độ lệch trọng tâm (Relative Center of Mass dọc theo trục chính):
+Công thức: Khoảng cách từ cuống lá đến trọng tâm chia cho tổng chiều dài lá.
+Ý nghĩa: Đặc trưng tuyệt vời để phân biệt lá phình to ở cuống (hình trứng - ovate) với lá phình to ở đầu lá (hình trứng ngược - obovate).
+Nhóm 2: Các đặc trưng Thống kê Bất biến (3 tham số)
+Dù mang tính toán học hơn, các mô-men này vẫn là "white-box" (có thể giải thích bằng sự phân bố khối lượng/diện tích) và có ưu điểm tuyệt đối: không thay đổi dù ảnh lá bị lộn ngược, xoay nghiêng hay phóng to.
+Hu Moment 1 (h1):
+Ý nghĩa: Đại diện cho "mô-men quán tính" tổng thể của chiếc lá. Chỉ số này phản ánh mức độ lan tỏa diện tích của chiếc lá ra xa khỏi tâm của nó.
+Hu Moment 2 (h2
+Ý nghĩa: Đo lường sự chênh lệch phân bố diện tích dọc theo hai trục chính. Tham số này bổ trợ cực tốt cho độ lệch tâm (Eccentricity) để xác nhận độ thuôn dài của lá.
+Hu Moment 3 h3
+Ý nghĩa: Thể hiện độ "lệch" hoặc tính bất đối xứng của chiếc lá (chẳng hạn như một số loại lá hay bị vẹo sang một bên thay vì mọc thẳng đứng trục).
