@@ -28,3 +28,34 @@ Hu Moment 2 (h2
 Ý nghĩa: Đo lường sự chênh lệch phân bố diện tích dọc theo hai trục chính. Tham số này bổ trợ cực tốt cho độ lệch tâm (Eccentricity) để xác nhận độ thuôn dài của lá.
 Hu Moment 3 h3
 Ý nghĩa: Thể hiện độ "lệch" hoặc tính bất đối xứng của chiếc lá (chẳng hạn như một số loại lá hay bị vẹo sang một bên thay vì mọc thẳng đứng trục).
+
+
+Nhóm 3: Các đặc trưng Gân lá (Vein Features)
+Đây là các đặc trưng mô tả hệ thống gân bên trong phiến lá, giúp phân biệt các lá có cùng hình dạng bên ngoài nhưng cấu trúc bên trong khác biệt.
+
+1. Mật độ gân (Vein Density):
+- Cách đo: Tỷ lệ diện tích bề mặt gân nổi / Tổng diện tích phiến lá (áp dụng phép Morphological Blackhat).
+- Ý nghĩa To/Nhỏ: 
+  + Giá trị LỚN (VD: > 0.05): Hệ thống gân trên lá rất to, gân khắc sâu, màu sắc gân tương phản mạnh (Ví dụ: lá chanh, lá bàng, lá ổi).
+  + Giá trị NHỎ (VD: < 0.02): Bề mặt lá nhẵn bóng, gân chìm, khó thấy nếu nhìn lướt qua (Ví dụ: lá hoa sứ, lá trúc).
+
+2. Mật độ cạnh gân (Vein Edge Density):
+- Cách đo: Tỷ lệ mật độ đường viền của các mạng gân / Tổng diện tích phiến lá (áp dụng toán tử Canny).
+- Ý nghĩa To/Nhỏ:
+  + Giá trị LỚN (VD: > 0.08): Mạng lưới gân chân chim cực kì chằng chịt, chia vô số nhánh phụ nhỏ li ti.
+  + Giá trị NHỎ (VD: < 0.03): Lá có gân viền rất đơn giản, chỉ 1 gân chính dọc ở giữa hoặc gân phụ chạy song song mượt mà (Ví dụ: lá tre, lá chuối).
+
+Nhóm 4: Các đặc trưng Đối xứng (Symmetry Features)
+Mô tả độ cân đối tự nhiên của chiếc lá theo chiều dọc và diện tích, hỗ trợ đánh giá mức độ khỏe mạnh hay biến dạng tự nhiên của chúng.
+
+1. Chỉ số bất đối xứng (Asymmetry Index):
+- Cách đo: Sử dụng hệ phân tích PCA kẹp một trục dọc xuyên giữa sinh học của chiếc lá và gập đôi, tính tỷ lệ chênh lệch diện tích giữa nửa trái và nửa phải. Thang đo [0.0, 1.0].
+- Ý nghĩa To/Nhỏ:
+  + Giá trị = 0: Tuyệt đối lý tưởng, đây là một chiếc lá đối xứng hoàn hảo trong tự nhiên.
+  + Giá trị LỚN (VD: > 0.1): Chiếc lá bị mọc lệch (các loại môn lẹo, thu hải đường) hoặc bị khuyết tật rách/côn trùng cắn hỏng mất một bên. Càng gần 1.0 thì lá càng biến dạng.
+
+2. Độ lệch trọng tâm (Center of Mass Shift):
+- Cách đo: Khoảng cách pixel (Euclidean distance) giữa Tâm hình học và Trọng tâm phân bố khối lượng màu sắc (đậm nhạt chất diệp lục).
+- Ý nghĩa To/Nhỏ:
+  + Giá trị = 0: Hoàn hảo. Tức là màu sắc, ánh sáng và phân bổ chất sinh học rải đều khắp mặt lá, sạch bệnh.
+  + Giá trị LỚN (VD: > 15 pixels): Lá có bệnh đốm lá đen xì, cháy màu, úa vàng dạt một góc hoặc thủng lỗ đen. Các bất thường này kéo trọng tâm màu bị giật lệch hẳn khỏi tọa độ trọng tâm hình học tự nhiên.
