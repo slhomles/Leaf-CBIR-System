@@ -31,31 +31,47 @@ Hu Moment 3 h3
 
 
 Nhóm 3: Các đặc trưng Gân lá (Vein Features)
-Đây là các đặc trưng mô tả hệ thống gân bên trong phiến lá, giúp phân biệt các lá có cùng hình dạng bên ngoài nhưng cấu trúc bên trong khác biệt.
+Đóng vai trò phân tích mạch rễ bên trong phiến lá. Gồm 5 đặc trưng:
 
 1. Mật độ gân (Vein Density):
-- Cách đo: Tỷ lệ diện tích bề mặt gân nổi / Tổng diện tích phiến lá (áp dụng phép Morphological Blackhat).
-- Ý nghĩa To/Nhỏ: 
-  + Giá trị LỚN (VD: > 0.05): Hệ thống gân trên lá rất to, gân khắc sâu, màu sắc gân tương phản mạnh (Ví dụ: lá chanh, lá bàng, lá ổi).
-  + Giá trị NHỎ (VD: < 0.02): Bề mặt lá nhẵn bóng, gân chìm, khó thấy nếu nhìn lướt qua (Ví dụ: lá hoa sứ, lá trúc).
+- Cách đo: Diện tích gân / Tổng diện tích lá (dùng Morphological Blackhat).
+- Ý nghĩa: Lá chanh, bàng có gân lớn (> 0.05). Lá hoa sứ nhẵn bóng có gân chìm (< 0.02).
 
 2. Mật độ cạnh gân (Vein Edge Density):
-- Cách đo: Tỷ lệ mật độ đường viền của các mạng gân / Tổng diện tích phiến lá (áp dụng toán tử Canny).
-- Ý nghĩa To/Nhỏ:
-  + Giá trị LỚN (VD: > 0.08): Mạng lưới gân chân chim cực kì chằng chịt, chia vô số nhánh phụ nhỏ li ti.
-  + Giá trị NHỎ (VD: < 0.03): Lá có gân viền rất đơn giản, chỉ 1 gân chính dọc ở giữa hoặc gân phụ chạy song song mượt mà (Ví dụ: lá tre, lá chuối).
+- Cách đo: Mật độ đường viền mạng gân / Tổng diện tích lá (dùng toán tử Canny).
+- Ý nghĩa: Mạng gân chân chim chằng chịt có giá trị cao. Gân song song đơn giản có giá trị thấp.
 
-Nhóm 4: Các đặc trưng Đối xứng (Symmetry Features)
-Mô tả độ cân đối tự nhiên của chiếc lá theo chiều dọc và diện tích, hỗ trợ đánh giá mức độ khỏe mạnh hay biến dạng tự nhiên của chúng.
+3. Độ dày sợi gân (Vein Thickness):
+- Cách đo: Diện tích bề mặt gân / Chiều dài viền cạnh gân.
+- Ý nghĩa: Phân biệt các loại lá có gân to bản (giá trị cao) với các loại lá có gân cực tơ mảnh (giá trị thấp).
 
-1. Chỉ số bất đối xứng (Asymmetry Index):
-- Cách đo: Sử dụng hệ phân tích PCA kẹp một trục dọc xuyên giữa sinh học của chiếc lá và gập đôi, tính tỷ lệ chênh lệch diện tích giữa nửa trái và nửa phải. Thang đo [0.0, 1.0].
-- Ý nghĩa To/Nhỏ:
-  + Giá trị = 0: Tuyệt đối lý tưởng, đây là một chiếc lá đối xứng hoàn hảo trong tự nhiên.
-  + Giá trị LỚN (VD: > 0.1): Chiếc lá bị mọc lệch (các loại môn lẹo, thu hải đường) hoặc bị khuyết tật rách/côn trùng cắn hỏng mất một bên. Càng gần 1.0 thì lá càng biến dạng.
+4. Độ nổi tương phản (Vein Contrast):
+- Cách đo: Cường độ đậm nhạt trung bình của vùng gân trên ảnh Blackhat.
+- Ý nghĩa: Đặc trưng cho lá có rãnh gân sâu thẳm, bắt sáng khác biệt so với nền diệp lục.
 
-2. Độ lệch trọng tâm (Center of Mass Shift):
-- Cách đo: Khoảng cách pixel (Euclidean distance) giữa Tâm hình học và Trọng tâm phân bố khối lượng màu sắc (đậm nhạt chất diệp lục).
-- Ý nghĩa To/Nhỏ:
-  + Giá trị = 0: Hoàn hảo. Tức là màu sắc, ánh sáng và phân bổ chất sinh học rải đều khắp mặt lá, sạch bệnh.
-  + Giá trị LỚN (VD: > 15 pixels): Lá có bệnh đốm lá đen xì, cháy màu, úa vàng dạt một góc hoặc thủng lỗ đen. Các bất thường này kéo trọng tâm màu bị giật lệch hẳn khỏi tọa độ trọng tâm hình học tự nhiên.
+5. Độ phân bố đồng đều (Vein Uniformity):
+- Cách đo: Độ lệch chuẩn của cường độ pixel trên mạng gân.
+- Ý nghĩa: Mạng gân trải đều khắp mặt lá sẽ có độ lệch thấp. Tập trung cục bộ sẽ có độ lệch cao.
+
+Nhóm 4: Các đặc trưng Đối xứng Hình học (Symmetry Features)
+Dùng thuật toán PCA đa trục để tìm chiều dài và chiều rộng sinh học bất chấp góc chụp. Gồm 5 đặc trưng:
+
+1. Lệch Ngực Lá Trái/Phải (Longitudinal Asymmetry):
+- Cách đo: Chênh lệch diện tích nửa trái và nửa phải dọc theo trục thân tự nhiên. Thang [0.0, 1.0].
+- Ý nghĩa: Về 0 là đối xứng hoàn hảo. Lệch xa 0 là lá mọc lệch (VD: thu hải đường) hoặc bị rách nát.
+
+2. Lệch Ngọn/Đáy (Transverse Asymmetry):
+- Cách đo: Sự chênh lệch diện tích của nửa Top (ngọn) và nửa Bottom (cuống).
+- Ý nghĩa: Lá hình thoi sẽ có giá trị về 0 do trên dưới bằng nhau. Lá hình tam giác hoặc hình trứng sẽ có giá trị lệch cao.
+
+3. Lệch Trọng Tâm Màu Sắc (Center of Mass Shift):
+- Cách đo: Khoảng cách Euclidean giữa Trọng tâm hình học và Trọng tâm màu (Mass Centroid).
+- Ý nghĩa: Chẩn đoán lá bệnh. Lá bị đốm đen, cháy màu, thủng lỗ sẽ kéo trọng tâm màu lệch khỏi tâm hình học (> 15 pixels).
+
+4. Lệch Đỉnh Sinh Lý (Length Asymmetry):
+- Cách đo: So sánh độ vươn của cành ngọn và cành đáy tính từ tâm.
+- Ý nghĩa: Kiểm tra xem cuống lá có mọc đúng ở chính giữa chiều dài tự nhiên của phiến lá hay không.
+
+5. Độ Sải Cánh (Width Asymmetry):
+- Cách đo: So sánh điểm thò ra xa trục nhất của vạt lá trái và vạt lá phải.
+- Ý nghĩa: Phân loại lá có bụng lồi đều 2 bên với lá bẹp 1 bên.

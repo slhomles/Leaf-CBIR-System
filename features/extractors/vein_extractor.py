@@ -5,9 +5,12 @@ def extract_vein_features(image_path: str) -> dict:
     """
     Trích xuất đặc trưng gân lá (Vein Features).
     Đầu vào: Nhận vào đường dẫn nguyên bản của ảnh.
-    Đầu ra: Dictionary chứa 2 tham số:
+    Đầu ra: Dictionary chứa 5 tham số định nghĩa mạch gân:
         - vein_density: Tỷ lệ diện tích bề mặt gân so với phiến lá.
         - vein_edge_density: Mật độ đường cạnh/viền của cấu trúc gân.
+        - vein_thickness: Ước lượng độ dày của sợi gân.
+        - vein_contrast: Độ nổi tương phản màu sắc gân.
+        - vein_uniformity: Độ phân bố đồng đều của mạng gân.
     """
     # Đọc ảnh hỗ trợ tốt đường dẫn Unicode trên Windows
     buf = np.fromfile(image_path, dtype=np.uint8)
@@ -41,16 +44,47 @@ def extract_vein_features(image_path: str) -> dict:
     veins_inside = cv2.bitwise_and(vein_mask, leaf_mask)
     edges_inside = cv2.bitwise_and(edges, leaf_mask)
     
+    leaf_area = np.count_nonzero(leaf_mask)
     vein_area = np.count_nonzero(veins_inside)
     edge_area = np.count_nonzero(edges_inside)
-    leaf_area = np.count_nonzero(leaf_mask)
     
-    vein_density = vein_area / leaf_area if leaf_area > 0 else 0.0
-    edge_density = edge_area / leaf_area if leaf_area > 0 else 0.0
+    if leaf_area == 0:
+        return {
+            "vein_density": 0.0,
+            "vein_edge_density": 0.0,
+            "vein_thickness": 0.0,
+            "vein_contrast": 0.0,
+            "vein_uniformity": 0.0
+        }
+        
+    # [1] Mật độ gân
+    vein_density = vein_area / leaf_area
+    
+    # [2] Mật độ cạnh gân
+    vein_edge_density = edge_area / leaf_area
+    
+    # [3] Độ dày sợi gân (Diện tích / Chiều dài cạnh bao quanh)
+    vein_thickness = vein_area / (edge_area + 1e-6) # Tránh chia cho 0
+    
+    # Khu vực lấy cường độ gân
+    blackhat_inside = cv2.bitwise_and(blackhat, leaf_mask)
+    active_veins = blackhat_inside[veins_inside > 0]
+    
+    vein_contrast = 0.0
+    vein_uniformity = 0.0
+    if len(active_veins) > 0:
+        # [4] Độ khắc nổi / màu sắc tương phản (Mean pixel intensity of veins)
+        vein_contrast = np.mean(active_veins)
+        
+        # [5] Mức độ phân bổ đồng đều (Standard Deviation of veins)
+        vein_uniformity = np.std(active_veins)
 
     return {
         "vein_density": round(float(vein_density), 4),
-        "vein_edge_density": round(float(edge_density), 4)
+        "vein_edge_density": round(float(vein_edge_density), 4),
+        "vein_thickness": round(float(vein_thickness), 4),
+        "vein_contrast": round(float(vein_contrast), 4),
+        "vein_uniformity": round(float(vein_uniformity), 4)
     }
 
 if __name__ == "__main__":
