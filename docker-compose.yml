@@ -1,1 +1,29 @@
-# Triển khai DB (PostgreSQL + pgvector) và API
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: leafsearch_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: leafsearch
+      POSTGRES_PASSWORD: leafsearch123
+      POSTGRES_DB: leafsearch_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    container_name: leafsearch_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  pgdata:

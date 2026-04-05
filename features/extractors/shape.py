@@ -2,7 +2,10 @@ import cv2
 import numpy as np
 import math
 
-class ShapeExtractor:
+from features.extractors.base import BaseExtractor
+
+
+class ShapeExtractor(BaseExtractor):
     """
     Trích xuất 10 đặc trưng hình dáng từ ảnh lá:
     1. Aspect Ratio
@@ -16,17 +19,13 @@ class ShapeExtractor:
     9. Hu Moment 2
     10. Hu Moment 3
     """
-    def __init__(self):
-        pass
 
     def extract(self, image_path: str) -> dict:
         """
         Đọc ảnh và trích xuất các đặc trưng hình dáng.
         Giả định ảnh đầu vào đã cắt nền (nền đen) và object chính là chiếc lá.
         """
-        image = cv2.imread(image_path)
-        if image is None:
-            raise ValueError(f"Không thể đọc ảnh: {image_path}")
+        image = self._read_image(image_path)
 
         # Chuyển ảnh sang grayscale và tạo nhị phân để tìm contour
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

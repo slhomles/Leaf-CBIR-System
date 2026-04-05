@@ -7,8 +7,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from features.extractors.vein_extractor import extract_vein_features
-from features.extractors.symmetry_extractor import extract_symmetry_features
+from features.extractors.vein_extractor import VeinExtractor
+from features.extractors.symmetry_extractor import SymmetryExtractor
 
 def run_tests(image_path: str):
     print("=" * 60)
@@ -24,7 +24,7 @@ def run_tests(image_path: str):
     # 1. Trích xuất đặc trưng gân lá (Vein)
     print(" [*] Đang xử lý nhóm đặc trưng Gân lá (Vein Features)...")
     try:
-        vein_result = extract_vein_features(image_path)
+        vein_result = VeinExtractor().extract(image_path)
         print("   [KẾT QUẢ]")
         for key, value in vein_result.items():
             print(f"     - {key:<20} : {value}")
@@ -36,7 +36,7 @@ def run_tests(image_path: str):
     # 2. Trích xuất đặc trưng đối xứng (Symmetry)
     print(" [*] Đang xử lý nhóm đặc trưng Đối xứng (Symmetry Features)...")
     try:
-        sym_result = extract_symmetry_features(image_path)
+        sym_result = SymmetryExtractor().extract(image_path)
         print("   [KẾT QUẢ]")
         for key, value in sym_result.items():
             print(f"     - {key:<20} : {value}")

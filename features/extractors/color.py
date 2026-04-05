@@ -3,8 +3,10 @@ import numpy as np
 from sklearn.cluster import KMeans
 import warnings
 
+from features.extractors.base import BaseExtractor
 
-class ColorExtractor:
+
+class ColorExtractor(BaseExtractor):
     """
     Trích xuất đặc trưng màu sắc từ ảnh lá (nền đen).
 
@@ -33,12 +35,6 @@ class ColorExtractor:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-
-    def _get_leaf_mask(self, image: np.ndarray) -> np.ndarray:
-        """Tạo binary mask phân tách lá khỏi nền đen."""
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, mask = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY)
-        return mask
 
     @staticmethod
     def _skewness(arr: np.ndarray) -> float:
@@ -177,9 +173,7 @@ class ColorExtractor:
               - ccv_incoherent_0 … ccv_incoherent_127                     (128 values)
             Tổng cộng: 402 đặc trưng
         """
-        image = cv2.imread(image_path)
-        if image is None:
-            raise ValueError(f"Không thể đọc ảnh: {image_path}")
+        image = self._read_image(image_path)
 
         mask = self._get_leaf_mask(image)
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)

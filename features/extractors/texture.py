@@ -2,8 +2,10 @@ import cv2
 import numpy as np
 from skimage.feature import graycomatrix, graycoprops, local_binary_pattern
 
+from features.extractors.base import BaseExtractor
 
-class TextureExtractor:
+
+class TextureExtractor(BaseExtractor):
     """
     Trích xuất đặc trưng kết cấu từ ảnh lá (nền đen).
 
@@ -29,18 +31,9 @@ class TextureExtractor:
     GLCM_LEVELS  = 64    # quantize grayscale từ 256 → 64 mức
     GLCM_ANGLES  = [0, np.pi / 4, np.pi / 2, 3 * np.pi / 4]
 
-    def __init__(self):
-        pass
-
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-
-    def _get_leaf_mask(self, image: np.ndarray) -> np.ndarray:
-        """Tạo binary mask phân tách lá khỏi nền đen."""
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, mask = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY)
-        return mask
 
     def _crop_roi(self, gray: np.ndarray, mask: np.ndarray):
         """Crop vùng bounding-box của lá để giảm tính toán không cần thiết."""
@@ -158,9 +151,7 @@ class TextureExtractor:
               - lbp_0 … lbp_9                                                    (10 values)
             Tổng cộng: 54 đặc trưng
         """
-        image = cv2.imread(image_path)
-        if image is None:
-            raise ValueError(f"Không thể đọc ảnh: {image_path}")
+        image = self._read_image(image_path)
 
         mask = self._get_leaf_mask(image)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
