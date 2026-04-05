@@ -19,6 +19,12 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data", "processed")
 
 
 def ingest():
+    # Kích hoạt pgvector trước khi khởi tạo bảng chứa VECTOR()
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector;'))
+        conn.commit()
+        
     # Tạo bảng nếu chưa có
     Base.metadata.create_all(bind=engine)
 
