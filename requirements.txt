@@ -23,3 +23,8 @@ python-dotenv>=1.0.0      # Read environment variables from .env
 SQLAlchemy>=2.0.20        # ORM for database interaction
 psycopg2-binary>=2.9.7    # PostgreSQL driver
 pgvector>=0.2.3           # Vector storage and query for PostgreSQL
+
+# =========================================================
+# PART 3: UI
+# =========================================================
+streamlit>=1.35.0         # Simple web UI for demo

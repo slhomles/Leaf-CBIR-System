@@ -5,8 +5,8 @@ from pgvector.sqlalchemy import Vector
 
 from db.database import Base
 
-# Tổng dimension: shape(10) + color(402) + texture(54) + symmetry(5) + vein(5) = 476
-FEATURE_DIM = 476
+# Tổng dimension: shape(10) + color(10) + texture(10) + symmetry(5) + vein(5) = 40
+FEATURE_DIM = 40
 
 
 class LeafImage(Base):
