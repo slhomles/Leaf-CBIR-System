@@ -1,115 +1,118 @@
-"""Các hàm tìm kiếm vector similarity — hỗ trợ 3 phương pháp: Cosine, L2, Manhattan."""
+"""Tìm kiếm ảnh tương đồng — Cosine distance trên 4 vector + tổ hợp trọng số.
 
+Theo spec: Total = W_shape·D_shape + W_color·D_color + W_texture·D_texture + W_venation·D_venation
+với D_x là cosine distance pgvector (toán tử <=>) trên cột tương ứng.
+"""
+
+from __future__ import annotations
+
+import json
 import os
-import numpy as np
-from sqlalchemy.orm import Session
+
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from db.models import LeafImage
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DATA_DIR = os.path.join(PROJECT_ROOT, "data", "processed")
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DATA_DIR = os.path.join(PROJECT_ROOT, 'data', 'processed')
+_BALANCED_PATH = os.path.join(PROJECT_ROOT, "data", "balanced_weights.json")
+_FALLBACK_WEIGHTS: dict[str, float] = {
+    "shape": 0.25,
+    "color": 0.25,
+    "texture": 0.25,
+    "venation": 0.25,
+}
+
+
+def _load_default_weights() -> dict[str, float]:
+    try:
+        with open(_BALANCED_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return {k: float(data[k]) for k in ("shape", "color", "texture", "venation")}
+    except (FileNotFoundError, KeyError, json.JSONDecodeError, ValueError, TypeError):
+        return dict(_FALLBACK_WEIGHTS)
+
+
+DEFAULT_WEIGHTS: dict[str, float] = _load_default_weights()
 
 
 def _resolve_path(file_name: str) -> str:
-    """Trả về đường dẫn thực tế của ảnh trên disk."""
     return os.path.join(DATA_DIR, file_name)
 
 
 def _vec_to_str(vec: list[float]) -> str:
-    """Chuyển list float thành chuỗi pgvector '[x1,x2,...]'."""
     return "[" + ",".join(f"{x:.8f}" for x in vec) + "]"
 
 
-def _rows_to_dicts(rows) -> list[dict]:
+def search_weighted_cosine(
+    query_vectors: dict[str, list[float]],
+    top_k: int,
+    db: Session,
+    weights: dict[str, float] | None = None,
+) -> list[dict]:
+    """
+    Tìm top_k ảnh có distance tổng hợp nhỏ nhất.
+
+    Args:
+        query_vectors: dict với keys {"shape","color","texture","venation"}
+                       — đã được Z-score normalize.
+        top_k: số kết quả trả về.
+        db: SQLAlchemy session.
+        weights: trọng số 4 nhóm (mặc định 0.25 đều nhau).
+
+    Returns:
+        list[dict] sắp xếp theo total ASC. Mỗi item gồm:
+          image_id, file_name, path, distance (= total),
+          và breakdown từng thành phần shape_dist / color_dist / ...
+    """
+    w = {**DEFAULT_WEIGHTS, **(weights or {})}
+
+    sql = text(
+        """
+        SELECT
+            image_id,
+            file_name,
+            (shape_vector    <=> CAST(:v_shape    AS vector)) AS d_shape,
+            (color_vector    <=> CAST(:v_color    AS vector)) AS d_color,
+            (texture_vector  <=> CAST(:v_texture  AS vector)) AS d_texture,
+            (venation_vector <=> CAST(:v_venation AS vector)) AS d_venation,
+            (
+                :w_shape    * (shape_vector    <=> CAST(:v_shape    AS vector)) +
+                :w_color    * (color_vector    <=> CAST(:v_color    AS vector)) +
+                :w_texture  * (texture_vector  <=> CAST(:v_texture  AS vector)) +
+                :w_venation * (venation_vector <=> CAST(:v_venation AS vector))
+            ) AS total
+        FROM leaf_images
+        ORDER BY total ASC
+        LIMIT :k
+        """
+    )
+
+    rows = db.execute(
+        sql,
+        {
+            "v_shape":    _vec_to_str(query_vectors["shape"]),
+            "v_color":    _vec_to_str(query_vectors["color"]),
+            "v_texture":  _vec_to_str(query_vectors["texture"]),
+            "v_venation": _vec_to_str(query_vectors["venation"]),
+            "w_shape":    w["shape"],
+            "w_color":    w["color"],
+            "w_texture":  w["texture"],
+            "w_venation": w["venation"],
+            "k":          top_k,
+        },
+    ).fetchall()
+
     return [
         {
             "image_id": r.image_id,
             "file_name": r.file_name,
-            "distance": float(r.distance),
             "path": _resolve_path(r.file_name),
+            "distance": float(r.total),
+            "shape_dist": float(r.d_shape),
+            "color_dist": float(r.d_color),
+            "texture_dist": float(r.d_texture),
+            "venation_dist": float(r.d_venation),
         }
         for r in rows
     ]
-
-
-# ---------------------------------------------------------------------------
-# Phương pháp 1: Cosine Distance  (pgvector <=>)
-# ---------------------------------------------------------------------------
-
-def search_cosine(query_vec: list[float], top_k: int, db: Session) -> list[dict]:
-    """
-    Tìm top_k ảnh gần nhất theo Cosine distance.
-    Dùng toán tử pgvector <=> — hỗ trợ HNSW/IVFFlat index.
-
-    Returns:
-        list[dict] sắp xếp theo distance tăng dần (0 = giống nhất).
-    """
-    sql = text("""
-        SELECT image_id, file_name,
-               feature_vector <=> CAST(:vec AS vector) AS distance
-        FROM leaf_images
-        ORDER BY distance
-        LIMIT :k
-    """)
-    rows = db.execute(sql, {"vec": _vec_to_str(query_vec), "k": top_k}).fetchall()
-    return _rows_to_dicts(rows)
-
-
-# ---------------------------------------------------------------------------
-# Phương pháp 2: L2 / Euclidean Distance  (pgvector <->)
-# ---------------------------------------------------------------------------
-
-def search_l2(query_vec: list[float], top_k: int, db: Session) -> list[dict]:
-    """
-    Tìm top_k ảnh gần nhất theo Euclidean (L2) distance.
-    Dùng toán tử pgvector <-> — hỗ trợ HNSW/IVFFlat index.
-
-    Returns:
-        list[dict] sắp xếp theo distance tăng dần.
-    """
-    sql = text("""
-        SELECT image_id, file_name,
-               feature_vector <-> CAST(:vec AS vector) AS distance
-        FROM leaf_images
-        ORDER BY distance
-        LIMIT :k
-    """)
-    rows = db.execute(sql, {"vec": _vec_to_str(query_vec), "k": top_k}).fetchall()
-    return _rows_to_dicts(rows)
-
-
-# ---------------------------------------------------------------------------
-# Phương pháp 3: Manhattan / L1 Distance  (tính trong Python)
-# ---------------------------------------------------------------------------
-
-def search_l1(query_vec: list[float], top_k: int, db: Session) -> list[dict]:
-    """
-    Tìm top_k ảnh gần nhất theo Manhattan (L1) distance.
-    Fetch toàn bộ vectors về Python rồi tính thủ công
-    (pgvector chưa hỗ trợ L1 natively).
-
-    Returns:
-        list[dict] sắp xếp theo distance tăng dần.
-    """
-    records = db.query(
-        LeafImage.image_id,
-        LeafImage.file_name,
-        LeafImage.feature_vector,
-    ).all()
-
-    q = np.array(query_vec, dtype=np.float64)
-
-    results = []
-    for r in records:
-        v = np.array(list(r.feature_vector), dtype=np.float64)
-        dist = float(np.sum(np.abs(q - v)))
-        results.append({
-            "image_id": r.image_id,
-            "file_name": r.file_name,
-            "distance": dist,
-            "path": _resolve_path(r.file_name),
-        })
-
-    results.sort(key=lambda x: x["distance"])
-    return results[:top_k]

@@ -1,6 +1,6 @@
 """
 Streamlit UI — Leaf Image Similarity Search
-Tìm top 5 ảnh lá giống nhất theo 3 phương pháp: Cosine, L2, Manhattan.
+Tìm top-5 ảnh lá giống nhất theo Cosine distance tổ hợp trọng số 4 nhóm đặc trưng.
 
 Chạy:
     streamlit run app.py
@@ -12,16 +12,15 @@ import tempfile
 
 import cv2
 import streamlit as st
-from PIL import Image
 
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
 from features.preprocess import preprocess
 from features.pipeline import extract_all
-from features.zscore import normalize
+from features.zscore import normalize_all
 from db.database import SessionLocal
-from db import crud
+from db.crud import search_weighted_cosine, DEFAULT_WEIGHTS
 
 # ---------------------------------------------------------------------------
 # Cấu hình trang
@@ -34,33 +33,45 @@ st.set_page_config(
 )
 
 st.title("🌿 Leaf Similarity Search")
-st.caption("Upload một ảnh lá → tìm 5 ảnh giống nhất theo 3 phương pháp đo khoảng cách")
+st.caption(
+    "Upload một ảnh lá → tìm 5 ảnh giống nhất theo Cosine distance "
+    "tổ hợp trọng số trên 4 nhóm: Shape (10) · Color (72) · Texture (38) · Venation (5)"
+)
+
+# ---------------------------------------------------------------------------
+# Sidebar: trọng số 4 nhóm
+# ---------------------------------------------------------------------------
+
+st.sidebar.header("Trọng số tổ hợp")
+st.sidebar.caption("Tổng các trọng số sẽ được tự chuẩn hóa về 1.")
+
+w_shape    = st.sidebar.slider("Shape",    0.0, 1.0, DEFAULT_WEIGHTS["shape"],    0.05)
+w_color    = st.sidebar.slider("Color",    0.0, 1.0, DEFAULT_WEIGHTS["color"],    0.05)
+w_texture  = st.sidebar.slider("Texture",  0.0, 1.0, DEFAULT_WEIGHTS["texture"],  0.05)
+w_venation = st.sidebar.slider("Venation", 0.0, 1.0, DEFAULT_WEIGHTS["venation"], 0.05)
+
+w_sum = w_shape + w_color + w_texture + w_venation
+if w_sum <= 0:
+    st.sidebar.error("Tổng trọng số phải > 0. Đang dùng mặc định 0.25 đều nhau.")
+    weights = DEFAULT_WEIGHTS
+else:
+    weights = {
+        "shape":    w_shape    / w_sum,
+        "color":    w_color    / w_sum,
+        "texture":  w_texture  / w_sum,
+        "venation": w_venation / w_sum,
+    }
+    st.sidebar.caption(
+        f"Sau chuẩn hóa: shape={weights['shape']:.2f}, color={weights['color']:.2f}, "
+        f"texture={weights['texture']:.2f}, venation={weights['venation']:.2f}"
+    )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-METHOD_INFO = {
-    "Cosine Distance": {
-        "desc": "Đo góc giữa 2 vector — ít nhạy cảm với scale",
-        "func": crud.search_cosine,
-        "color": "#2196F3",
-    },
-    "L2 / Euclidean": {
-        "desc": "Khoảng cách Euclid — hiệu quả sau Z-score normalize",
-        "func": crud.search_l2,
-        "color": "#4CAF50",
-    },
-    "Manhattan L1": {
-        "desc": "Tổng |aᵢ - bᵢ| — robust hơn với outlier",
-        "func": crud.search_l1,
-        "color": "#FF9800",
-    },
-}
-
-
 def show_results(results: list[dict]):
-    """Hiển thị top-5 kết quả theo dạng lưới 5 cột."""
+    """Hiển thị top-5 kết quả theo dạng lưới 5 cột với breakdown distance."""
     cols = st.columns(5)
     for col, r in zip(cols, results):
         with col:
@@ -68,7 +79,12 @@ def show_results(results: list[dict]):
                 st.image(r["path"], use_container_width=True)
             else:
                 st.warning("Không tìm thấy ảnh")
-            st.caption(f"**{r['file_name']}**\n\ndist = `{r['distance']:.4f}`")
+            st.caption(
+                f"**{r['file_name']}**\n\n"
+                f"total = `{r['distance']:.4f}`\n\n"
+                f"shape={r['shape_dist']:.3f} · color={r['color_dist']:.3f}\n\n"
+                f"texture={r['texture_dist']:.3f} · vein={r['venation_dist']:.3f}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -92,52 +108,47 @@ with col_preview:
 # Search
 # ---------------------------------------------------------------------------
 
-if uploaded:
-    if st.button("🔍 Tìm kiếm", type="primary"):
-        suffix = os.path.splitext(uploaded.name)[-1] or ".jpg"
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(uploaded.getvalue())
-            tmp_path = tmp.name
+if uploaded and st.button("🔍 Tìm kiếm", type="primary"):
+    suffix = os.path.splitext(uploaded.name)[-1] or ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(uploaded.getvalue())
+        tmp_path = tmp.name
 
-        try:
-            # Tiền xử lý: xóa nền + resize 256×256
-            with st.spinner("Đang tiền xử lý ảnh..."):
-                preprocessed_bgr = preprocess(tmp_path)
-                cv2.imwrite(tmp_path, preprocessed_bgr)
+    try:
+        with st.spinner("Đang tiền xử lý ảnh..."):
+            preprocessed_bgr = preprocess(tmp_path)
+            cv2.imwrite(tmp_path, preprocessed_bgr)
 
-            # Hiển thị ảnh sau preprocessing để user kiểm tra
-            preprocessed_rgb = cv2.cvtColor(preprocessed_bgr, cv2.COLOR_BGR2RGB)
-            st.image(preprocessed_rgb, caption="Ảnh sau tiền xử lý (nền đen — dùng để tìm kiếm)", width=220)
+        preprocessed_rgb = cv2.cvtColor(preprocessed_bgr, cv2.COLOR_BGR2RGB)
+        st.image(
+            preprocessed_rgb,
+            caption="Ảnh sau tiền xử lý (nền đen — dùng để tìm kiếm)",
+            width=220,
+        )
 
-            with st.spinner("Đang trích xuất đặc trưng..."):
-                raw_vec = extract_all(tmp_path)
-                norm_vec = normalize(raw_vec)
+        with st.spinner("Đang trích xuất đặc trưng (4 nhóm)..."):
+            raw_vectors = extract_all(tmp_path)
+            norm_vectors = normalize_all(raw_vectors)
 
-            db = SessionLocal()
+        db = SessionLocal()
+        st.divider()
 
-            st.divider()
+        with st.spinner("Đang tìm Cosine weighted..."):
+            results = search_weighted_cosine(
+                norm_vectors, top_k=5, db=db, weights=weights
+            )
 
-            for method_name, info in METHOD_INFO.items():
-                label_col, _ = st.columns([3, 7])
-                with label_col:
-                    st.markdown(
-                        f"<span style='color:{info['color']};font-size:18px;font-weight:bold'>"
-                        f"● {method_name}</span>",
-                        unsafe_allow_html=True,
-                    )
-                st.caption(info["desc"])
+        st.markdown(
+            "<span style='color:#2196F3;font-size:18px;font-weight:bold'>"
+            "● Cosine Distance (weighted)</span>",
+            unsafe_allow_html=True,
+        )
+        show_results(results)
+        db.close()
 
-                with st.spinner(f"Đang tìm với {method_name}..."):
-                    results = info["func"](norm_vec, top_k=5, db=db)
-
-                show_results(results)
-                st.divider()
-
-            db.close()
-
-        except FileNotFoundError as e:
-            st.error(str(e))
-        except Exception as e:
-            st.error(f"Lỗi: {e}")
-        finally:
-            os.unlink(tmp_path)
+    except FileNotFoundError as e:
+        st.error(str(e))
+    except Exception as e:
+        st.error(f"Lỗi: {e}")
+    finally:
+        os.unlink(tmp_path)

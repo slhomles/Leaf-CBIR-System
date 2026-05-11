@@ -1,154 +1,116 @@
+"""Shape extractor — 10 chiều: 7 hình học + 3 Hu moments (log-transformed)."""
+
+import math
+
 import cv2
 import numpy as np
-import math
 
 from features.extractors.base import BaseExtractor
 
 
 class ShapeExtractor(BaseExtractor):
     """
-    Trích xuất 10 đặc trưng hình dáng từ ảnh lá:
-    1. Aspect Ratio
-    2. Solidity
-    3. Circularity (Compactness)
-    4. Convexity
-    5. Extent
-    6. Eccentricity
-    7. Relative Center of Mass
-    8. Hu Moment 1
-    9. Hu Moment 2
-    10. Hu Moment 3
+    Trích xuất 10 đặc trưng hình dáng từ ảnh lá (giả định nền đen).
+
+    Thứ tự trong vector (bắt buộc — định nghĩa shape_vector VECTOR(10)):
+      F01 aspect_ratio          = min(w,h) / max(w,h)
+      F02 solidity              = area / convex_area
+      F03 circularity           = 4πA / P²
+      F04 convexity             = perimeter_hull / perimeter_contour
+      F05 extent                = area / (w · h)
+      F06 eccentricity          = sqrt(1 - b²/a²) từ fitEllipse
+      F07 relative_center_of_mass = min(cy - y_bb, y_bb + h - cy) / h
+      F08 hu_1   (log-transformed)
+      F09 hu_2   (log-transformed)
+      F10 hu_3   (log-transformed)
     """
 
     def extract(self, image_path: str) -> dict:
-        """
-        Đọc ảnh và trích xuất các đặc trưng hình dáng.
-        Giả định ảnh đầu vào đã cắt nền (nền đen) và object chính là chiếc lá.
-        """
         image = self._read_image(image_path)
+        mask = self._get_leaf_mask(image)
 
-        # Chuyển ảnh sang grayscale và tạo nhị phân để tìm contour
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY)
-        
-        # Tìm contour của chiếc lá
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             raise ValueError("Không tìm thấy chiếc lá trong ảnh.")
-            
-        # Lấy contour lớn nhất (đáng lẽ là chiếc lá)
+
         c = max(contours, key=cv2.contourArea)
-        
-        # 1. Tính toán diện tích và chu vi thực
         area = cv2.contourArea(c)
         perimeter = cv2.arcLength(c, True)
         if area == 0 or perimeter == 0:
             raise ValueError("Contour không hợp lệ (diện tích hoặc chu vi = 0).")
 
-        # 2. Bounding Rectangle
         x, y, w, h = cv2.boundingRect(c)
-        
-        # Đặc trưng 1: Aspect Ratio = w / h (hoặc h / w, tùy định nghĩa, thường lấy dài/rộng > 1 hoặc w/h)
-        # Để thống nhất, tính min/max để có tỷ lệ < 1
-        aspect_ratio = min(w, h) / max(w, h) if max(w, h) > 0 else 0
 
-        # Đặc trưng 5: Extent = Phân bố diện tích trong Box
+        # F01 aspect_ratio
+        aspect_ratio = min(w, h) / max(w, h) if max(w, h) > 0 else 0.0
+
+        # F05 extent
         rect_area = w * h
-        extent = area / rect_area if rect_area > 0 else 0
+        extent = area / rect_area if rect_area > 0 else 0.0
 
-        # 3. Convex Hull
+        # F02 solidity, F04 convexity
         hull = cv2.convexHull(c)
         hull_area = cv2.contourArea(hull)
         hull_perimeter = cv2.arcLength(hull, True)
-        
-        # Đặc trưng 2: Solidity
-        solidity = area / hull_area if hull_area > 0 else 0
-        
-        # Đặc trưng 4: Convexity
-        convexity = hull_perimeter / perimeter if perimeter > 0 else 0
+        solidity = area / hull_area if hull_area > 0 else 0.0
+        convexity = hull_perimeter / perimeter if perimeter > 0 else 0.0
 
-        # Đặc trưng 3: Circularity
-        # Công thức chuẩn: 4 * pi * Area / Perimeter^2
-        circularity = (4 * math.pi * area) / (perimeter ** 2)
+        # F03 circularity
+        circularity = (4.0 * math.pi * area) / (perimeter ** 2)
 
-        # 4. Fit Ellipse cho Eccentricity
-        # FitEllipse yêu cầu contour có ít nhất 5 điểm
-        eccentricity = 0
+        # F06 eccentricity
+        eccentricity = 0.0
         if len(c) >= 5:
-            (cx, cy), (MA, ma), angle = cv2.fitEllipse(c)
-            # Eccentricity = sqrt(1 - (minor_axis/major_axis)^2)
-            if ma > 0:
-                a = ma / 2
-                b = MA / 2
-                eccentricity = math.sqrt(1 - (b**2 / a**2)) if a >= b else math.sqrt(1 - (a**2 / b**2))
+            (_, _), (MA, ma), _ = cv2.fitEllipse(c)
+            a = max(MA, ma) / 2.0
+            b = min(MA, ma) / 2.0
+            if a > 0:
+                eccentricity = math.sqrt(max(0.0, 1.0 - (b ** 2) / (a ** 2)))
 
-        # 5. Moments cho Trọng tâm và Hu Moments
-        M = cv2.moments(c)
-        
-        # Tính Relative Center of Mass (dọc theo trục chính)
-        # Tạm tính khoảng cách từ trọng tâm (M['m10']/M['m00'], M['m01']/M['m00']) 
-        # So với chiều dài lá lớn nhất (max(w,h))
-        relative_center_of_mass = 0
-        if M['m00'] != 0:
-            cx_m = M['m10'] / M['m00']
-            cy_m = M['m01'] / M['m00']
-            
-            # Gốc lá (cuống) thường nằm ở viền bounding box
-            # Tính khoảng cách từ trọng tâm đến một góc hoặc mép (ước tính)
-            # Công thức từ doc: Khoảng cách từ cuống lá đến trọng tâm chia cho tổng chiều cao/chiều dài
-            # Ta dùng khoảng cách từ cy_m đến đáy (hoặc đỉnh) chia cho h
-            # Do ảnh không biết chiều cuống, ta lấy tỷ lệ chiều y của trọng tâm trong bounding box
-            relative_center_of_mass = abs(cy_m - y) / h if h > 0 else 0
-            
-            # Khắc phục trường hợp cuống ở dưới (y + h)
-            # relative_center_of_mass có thể được định nghĩa luôn là min(cy_m-y, y+h-cy_m)/h 
-            # để biểu diễn độ lệch so với tâm
-            relative_center_of_mass = min(abs(cy_m - y), abs(y + h - cy_m)) / h if h > 0 else 0
+        # F07 relative_center_of_mass — khoảng cách trọng tâm tới mép gần hơn / chiều cao bbox
+        moments = cv2.moments(c)
+        relative_center_of_mass = 0.0
+        if moments["m00"] != 0 and h > 0:
+            cy = moments["m01"] / moments["m00"]
+            relative_center_of_mass = min(cy - y, (y + h) - cy) / h
 
-        # Đặc trưng 8, 9, 10: Hu Moments (1, 2, 3)
-        hu_moments = cv2.HuMoments(M)
-        # Log transform cho Hu Moments để scale giá trị
+        # F08-F10 Hu moments với log-transform: -sign(h) · log10(|h|)
+        hu_raw = cv2.HuMoments(moments).flatten()
         hu = []
-        for i in range(3):  # Chỉ lấy 3 giá trị đầu (h1, h2, h3)
-            val = hu_moments[i][0]
-            if val != 0:
-                # Dùng log transform để giá trị dễ so sánh hơn: -sign(h) * log10(abs(h))
-                hu.append(-1 * math.copysign(1.0, val) * math.log10(abs(val)))
-            else:
+        for i in range(3):
+            val = float(hu_raw[i])
+            if val == 0.0:
                 hu.append(0.0)
+            else:
+                hu.append(-math.copysign(1.0, val) * math.log10(abs(val) + 1e-10))
 
-        # Đóng gói kết quả
         return {
-            "aspect_ratio": aspect_ratio,
-            "solidity": solidity,
-            "circularity": circularity,
-            "convexity": convexity,
-            "extent": extent,
-            "eccentricity": eccentricity,
-            "relative_center_of_mass": relative_center_of_mass,
+            "aspect_ratio": float(aspect_ratio),
+            "solidity": float(solidity),
+            "circularity": float(circularity),
+            "convexity": float(convexity),
+            "extent": float(extent),
+            "eccentricity": float(eccentricity),
+            "relative_center_of_mass": float(relative_center_of_mass),
             "hu_moment_1": hu[0],
             "hu_moment_2": hu[1],
-            "hu_moment_3": hu[2]
+            "hu_moment_3": hu[2],
         }
 
+
 if __name__ == "__main__":
-    # Test script ad-hoc
-    import sys
-    
-    # Do chạy từ root directory nên để đường dẫn tương đối từ root
-    test_image = "d:/tailieuhoctap/Nam4Ky2/Multimedia_database_system/leafsearch_project/data/processed/1001.jpg"
-    
     import os
+    import sys
+
+    test_image = sys.argv[1] if len(sys.argv) > 1 else \
+        "d:/tailieuhoctap/Nam4Ky2/Multimedia_database_system/leafsearch_project/data/processed/1001.jpg"
+
     if not os.path.exists(test_image):
         print(f"Ảnh test không tồn tại: {test_image}")
         sys.exit(1)
-        
+
     extractor = ShapeExtractor()
-    try:
-        features = extractor.extract(test_image)
-        print("Kết quả trích xuất đặc trưng hình dáng:")
-        for k, v in features.items():
-            print(f"- {k}: {v:.6f}")
-    except Exception as e:
-        print(f"Lỗi: {e}")
+    features = extractor.extract(test_image)
+    print(f"Số chiều: {len(features)}")
+    for k, v in features.items():
+        print(f"  {k}: {v:.6f}")

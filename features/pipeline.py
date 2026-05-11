@@ -1,31 +1,33 @@
-"""Pipeline trích xuất đặc trưng — ghép output của 5 extractor thành 1 vector."""
+"""Pipeline trích xuất đặc trưng — trả về 4 vector riêng biệt."""
+
+from __future__ import annotations
 
 from features.extractors.shape import ShapeExtractor
 from features.extractors.color import ColorExtractor
 from features.extractors.texture import TextureExtractor
-from features.extractors.symmetry_extractor import SymmetryExtractor
 from features.extractors.vein_extractor import VeinExtractor
 
-
-# Thứ tự cố định: shape(10) + color(10) + texture(10) + symmetry(5) + vein(5) = 40
-EXTRACTORS = [
-    ShapeExtractor(),
-    ColorExtractor(),
-    TextureExtractor(),
-    SymmetryExtractor(),
-    VeinExtractor(),
-]
+# Single instance per extractor (state-less, an toàn để dùng chung)
+_SHAPE = ShapeExtractor()
+_COLOR = ColorExtractor()
+_TEXTURE = TextureExtractor()
+_VEIN = VeinExtractor()
 
 
-def extract_all(image_path: str) -> list[float]:
+def extract_all(image_path: str) -> dict[str, list[float]]:
     """
-    Trích xuất toàn bộ đặc trưng từ ảnh và ghép thành 1 vector phẳng.
+    Trích xuất 4 nhóm đặc trưng từ 1 ảnh.
 
     Returns:
-        list[float] có 40 phần tử.
+        dict với keys:
+          - "shape":    list 10 float
+          - "color":    list 72 float
+          - "texture":  list 38 float
+          - "venation": list 5 float
     """
-    vector = []
-    for extractor in EXTRACTORS:
-        features = extractor.extract(image_path)
-        vector.extend(features.values())
-    return vector
+    return {
+        "shape": list(_SHAPE.extract(image_path).values()),
+        "color": list(_COLOR.extract(image_path).values()),
+        "texture": list(_TEXTURE.extract(image_path).values()),
+        "venation": list(_VEIN.extract(image_path).values()),
+    }

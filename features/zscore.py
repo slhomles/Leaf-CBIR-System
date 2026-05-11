@@ -1,56 +1,68 @@
+"""Z-score normalization per-group cho 4 nhóm đặc trưng (shape/color/texture/venation).
+
+Params được lưu tại data/zscore_params.npz dưới dạng 8 mảng:
+    shape_mean, shape_std,
+    color_mean, color_std,
+    texture_mean, texture_std,
+    venation_mean, venation_std
+
+Lưu một lần bằng scripts/normalize.py, lazy-load khi gọi normalize_*.
 """
-Utility Z-score normalization cho query vector lúc tìm kiếm.
 
-Dùng params đã tính từ scripts/normalize.py (lưu tại data/zscore_params.npz).
-
-Ví dụ:
-    from features.zscore import normalize
-    from features.pipeline import extract_all
-
-    raw_vec = extract_all("path/to/image.jpg")
-    norm_vec = normalize(raw_vec)   # dùng norm_vec để tìm kiếm trong pgvector
-"""
+from __future__ import annotations
 
 import os
+from typing import Iterable
+
 import numpy as np
 
-_PARAMS_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'zscore_params.npz')
+_PARAMS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "zscore_params.npz")
+_GROUPS = ("shape", "color", "texture", "venation")
 
-_mean: np.ndarray | None = None
-_std:  np.ndarray | None = None
-
-
-def _load_params() -> tuple[np.ndarray, np.ndarray]:
-    """Tải mean và std từ file (lazy load, chỉ đọc 1 lần)."""
-    global _mean, _std
-    if _mean is None:
-        path = os.path.abspath(_PARAMS_PATH)
-        if not os.path.exists(path):
-            raise FileNotFoundError(
-                f"Không tìm thấy Z-score params tại: {path}\n"
-                "Hãy chạy: python -X utf8 scripts/normalize.py"
-            )
-        data = np.load(path)
-        _mean = data['mean']
-        _std  = data['std']
-    return _mean, _std
+_cache: dict[str, tuple[np.ndarray, np.ndarray]] | None = None
 
 
-def normalize(vector: list[float]) -> list[float]:
-    """
-    Áp dụng Z-score normalization lên vector đặc trưng thô.
+def _load_params() -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    global _cache
+    if _cache is not None:
+        return _cache
 
-    Args:
-        vector: list[float] có 40 phần tử (output của extract_all).
+    path = os.path.abspath(_PARAMS_PATH)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Không tìm thấy Z-score params tại: {path}\n"
+            "Hãy chạy: python -X utf8 scripts/normalize.py"
+        )
 
-    Returns:
-        list[float] đã normalize, sẵn sàng để tìm kiếm trong pgvector.
-    """
-    mean, std = _load_params()
-    v = np.array(vector, dtype=np.float64)
+    data = np.load(path)
+    cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for group in _GROUPS:
+        cache[group] = (data[f"{group}_mean"], data[f"{group}_std"])
+    _cache = cache
+    return cache
+
+
+def normalize_group(vector: Iterable[float], group: str) -> list[float]:
+    """Áp dụng Z-score cho 1 nhóm đặc trưng cụ thể."""
+    if group not in _GROUPS:
+        raise ValueError(f"Unknown group '{group}'. Phải là một trong {_GROUPS}.")
+    mean, std = _load_params()[group]
+    v = np.asarray(list(vector), dtype=np.float64)
     return ((v - mean) / (std + 1e-8)).tolist()
 
 
-def get_params() -> tuple[np.ndarray, np.ndarray]:
-    """Trả về (mean, std) array nếu cần dùng thủ công."""
-    return _load_params()
+def normalize_all(vectors: dict[str, list[float]]) -> dict[str, list[float]]:
+    """Normalize cả 4 nhóm cùng lúc, trả về dict cùng cấu trúc."""
+    return {group: normalize_group(vectors[group], group) for group in _GROUPS}
+
+
+def get_params(group: str) -> tuple[np.ndarray, np.ndarray]:
+    if group not in _GROUPS:
+        raise ValueError(f"Unknown group '{group}'.")
+    return _load_params()[group]
+
+
+def reset_cache() -> None:
+    """Buộc reload params từ disk (dùng sau khi normalize.py chạy lại)."""
+    global _cache
+    _cache = None
