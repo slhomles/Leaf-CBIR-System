@@ -19,8 +19,8 @@ w_vein  = FEATURE_WEIGHTS[4] if len(FEATURE_WEIGHTS) > 4 else 3.0
 
 WEIGHT_ARRAY = np.concatenate([
     np.full(10, w_shape),    # Shape
-    np.full(402, w_color),   # Color
-    np.full(54, w_tex),      # Texture
+    np.full(10, w_color),    # Color (Đã rút gọn còn 10)
+    np.full(10, w_tex),      # Texture (Đã rút gọn còn 10)
     np.full(5, w_sym),       # Symmetry
     np.full(5, w_vein)       # Vein
 ])

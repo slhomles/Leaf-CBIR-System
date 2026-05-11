@@ -7,7 +7,7 @@ from features.extractors.symmetry_extractor import SymmetryExtractor
 from features.extractors.vein_extractor import VeinExtractor
 
 
-# Thứ tự cố định: shape(10) + color(402) + texture(54) + symmetry(5) + vein(5) = 476
+# Thứ tự cố định: shape(10) + color(10) + texture(10) + symmetry(5) + vein(5) = 40
 EXTRACTORS = [
     ShapeExtractor(),
     ColorExtractor(),
@@ -22,7 +22,7 @@ def extract_all(image_path: str) -> list[float]:
     Trích xuất toàn bộ đặc trưng từ ảnh và ghép thành 1 vector phẳng.
 
     Returns:
-        list[float] có 476 phần tử.
+        list[float] có 40 phần tử.
     """
     vector = []
     for extractor in EXTRACTORS:
