@@ -1,0 +1,13 @@
+{
+  "shape": 0.35,
+  "color": 0.15,
+  "texture": 0.25,
+  "venation": 0.25,
+  "_meta": {
+    "method": "Grid Search Optimization",
+    "metric": "mAP@5",
+    "best_score": 0.9168,
+    "validation_queries": 50,
+    "step": 0.05
+  }
+}
